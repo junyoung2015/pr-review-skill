@@ -1,0 +1,18 @@
+{
+  "name": "pr-review-skill",
+  "owner": {
+    "name": "Jun Young Sohn",
+    "email": "junyoung.eddie@gmail.com"
+  },
+  "metadata": {
+    "description": "AI-powered PR review pipeline for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "pr-review",
+      "source": "./",
+      "description": "Deep code-centric PR review with CodeRabbit triage, fix-forward, educational feedback, and developer growth tracking",
+      "version": "0.1.0"
+    }
+  ]
+}

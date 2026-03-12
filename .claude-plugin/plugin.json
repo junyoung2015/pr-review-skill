@@ -1,0 +1,22 @@
+{
+  "name": "pr-review",
+  "description": "AI-powered PR review pipeline - deep code analysis, CodeRabbit triage, fix-forward, educational feedback, and developer growth tracking. Turns 30-45 min reviews into ~8 min structured reviews.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Jun Young Sohn",
+    "url": "https://github.com/junyoung2015"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/junyoung2015/pr-review-skill"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/junyoung2015/pr-review-skill#readme",
+  "keywords": [
+    "pr-review",
+    "code-review",
+    "coderabbit",
+    "fix-forward",
+    "developer-feedback"
+  ]
+}

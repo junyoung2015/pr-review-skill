@@ -1,0 +1,545 @@
+---
+name: pr-review
+description: >
+  Deep code-centric review of pull requests for the moving-frontend monorepo. Use when the user
+  mentions reviewing a PR, triaging CodeRabbit comments, doing a code review, or wants feedback
+  on a team member's code. Also trigger for "리뷰", "PR 리뷰", "코드 리뷰", "review PR",
+  "review this PR", or when a PR doc path is provided. Performs independent deep code analysis
+  with git-truth validation, scope-aware triage, and educational Korean-language feedback.
+  CodeRabbit comment triage is secondary — the review stands alone even with 0 CodeRabbit comments.
+---
+
+# PR Review Skill
+
+Help Eddie (team leader) efficiently review PRs through independent deep code analysis. Produce structured review documents with git-truth validation, scope-aware findings, educational feedback, and developer growth tracking.
+
+**Output language**: Korean with English technical terms (component names, TypeScript types, React concepts).
+
+## Modes
+
+1. **Full Review** (default) — Complete PR review: git-truth validation, deep code review, CodeRabbit triage (if any), developer tracking
+2. **Quick Review** (`--quick`) — Skip CodeRabbit triage + developer history. Just git-truth validation and deep code review. Use for fast turnaround when CodeRabbit output is unavailable or irrelevant. The output document must **completely omit** the "CodeRabbit 코멘트 검증" section (not include it with a "skipped" note — omit it entirely).
+3. **Triage Only** (`--triage-only`) — Only process CodeRabbit comments without deep code review
+4. **Developer History** (`--history <github-id>`) — Show a developer's accumulated review patterns
+5. **Auto Review** (`--auto <PR#>`) — One-command end-to-end pipeline: fetch PR from GitHub, run full review, fix-forward, commit, push, reply to CodeRabbit comments, resolve accepted threads. See Step 11.
+
+## Parameters
+
+When invoked, extract these from the user's message:
+
+- **PR doc path** (required): Path to the PR document, typically `docs/pr-for-review/[TICKET-ID] ...md`
+- **Branch name** (required): The feature branch to review, e.g. `ACME-595/split-place-card`
+- **GitHub ID** (required): PR creator's GitHub username — extract from the PR doc title (`# [TICKET] Title by <github-id>`) or ask the user
+- **Ticket ID** (auto-extracted): Extracted from PR title or branch name (e.g., `ACME-595`). Used for scope determination.
+- **Flags** (optional): `--quick`, `--triage-only`, `--history <github-id>`, `--auto <PR#>`
+
+If the user provides a GitHub PR URL instead of a local path, use `gh pr view <number> --json body` to fetch the content. Fall back to asking for a local doc path if `gh` is unavailable.
+
+When `--auto` is used, the PR number replaces the need for a PR doc path — the skill fetches it automatically via `scripts/fetch-pr.sh`. Branch name and GitHub ID are extracted from the fetched PR metadata.
+
+---
+
+## Execution Workflow
+
+### Step 1: Parse PR Document + Extract Claims
+
+Read the PR doc and extract structured data:
+
+1. **Header**: ticket ID (e.g. `ACME-595`), title, author GitHub ID
+2. **Features section** (`## ✨ Features`): what the PR claims to do → build a **claim list**
+3. **Changes section** (`## 🔄 Changes`): component table, file tree → build a **claimed file list**
+4. **CodeRabbit Summary** (after `<!-- auto-generated comment: release notes -->`): high-level change summary
+5. **CodeRabbit Comments** (after `# Comment | by CodeRabbit bot`): actionable + nitpick comments (may be empty)
+
+The claim list is used in Step 2 for git-truth validation. For CodeRabbit comment parsing, read `references/coderabbit-triage-guide.md`.
+
+### Step 2: Git-Truth Validation (NEW)
+
+Verify PR document claims against the actual git diff. Load `references/review-criteria.md` Section J.
+
+1. Run `git diff dev..HEAD --name-only` to get the authoritative list of changed files
+2. Cross-reference with the PR doc's file tree:
+   - Flag **undocumented changes** (in diff, not in doc)
+   - Flag **phantom files** (in doc, not in diff)
+   - Flag **inaccurate descriptions** (file listed but change doesn't match)
+3. Build **scope map** from commit messages:
+   - Run `git log dev..HEAD --oneline`
+   - Commits with `[TICKET-ID]` prefix → changed files are **IN_SCOPE**
+   - Commits with different ticket prefix → changed files are **OUT_OF_SCOPE**
+   - Commits with no prefix → **IN_SCOPE** (assumed)
+4. Produce a verification table (see Section J format)
+5. If OUT_OF_SCOPE files exist, note this for the scope section in the output
+
+### Step 3: Read Actual Code (Deep)
+
+The actual source code is the primary review source — the PR doc provides context only.
+
+1. For each **IN_SCOPE** changed file:
+   - Read the full file to understand context
+   - Read the specific diff with `git diff dev..HEAD -- <filepath>`
+   - Note architecture, patterns, and potential issues
+2. For each **OUT_OF_SCOPE** changed file:
+   - **Skim only**: read the diff, check for obvious bugs
+   - Do NOT deep-review these files
+3. Cross-compare sibling components:
+   - If the PR adds/modifies a component, read its sibling components in the same directory
+   - Check for consistency in prop interfaces, naming, patterns
+4. Check barrel exports (e.g. `index.ts`) for proper re-export organization
+5. Check import statements for FSD layer compliance
+
+Prioritize: new files first, then modified files, then renamed/deleted files.
+
+### Step 4: Independent Deep Code Review (NEW — PRIMARY SPINE)
+
+This is the core of the review and runs **unconditionally** — regardless of whether CodeRabbit produced comments or not. Load `references/review-criteria.md` and perform a thorough, adversarial review of every IN_SCOPE file.
+
+**Review Dimensions** (9 categories):
+
+| Dimension           | Criteria Section | Focus                                            |
+| ------------------- | ---------------- | ------------------------------------------------ |
+| Bugs & Correctness  | —                | Runtime errors, logic bugs, null dereferences    |
+| Architecture / FSD  | A                | Layer compliance, import direction, API location |
+| React & TypeScript  | B                | useWatch, useEffect deps, type safety            |
+| Sibling Consistency | I, K             | Parallel patterns across related components      |
+| DRY / Duplication   | I                | Repeated logic, extractable utilities            |
+| UI / Design System  | C                | Semantic tokens, layout patterns, hover states   |
+| Error Handling      | D                | safeResponseJson, mutation error UX              |
+| Accessibility       | F                | aria-labels, semantic HTML, keyboard             |
+| Performance         | H                | useCallback, useMemo, N+1 patterns               |
+
+**Adversarial Review Process** (go beyond checklist-walking):
+
+1. **Per-file dimension walk**: For each IN_SCOPE file, check all 9 dimensions. Don't just skim — read the logic line by line.
+2. **Try to break it mentally**: For each piece of logic, ask "what input or state would cause this to fail?" Check:
+   - What happens with empty arrays, null, undefined, 0, empty strings?
+   - What if the API returns an unexpected shape or error?
+   - What if the user navigates away mid-operation?
+   - What if this component renders before its data is loaded?
+3. **Trace data flow end-to-end**: Follow props from parent → child, follow state from hook → render, follow API data from fetch → display. Flag any point where types narrow unsafely or data is assumed present.
+4. **Check what's MISSING, not just what's wrong**: Missing error boundaries, missing loading states, missing barrel exports, missing type guards at boundaries, missing accessibility attributes.
+5. **Cross-compare siblings**: Read sibling components in the same directory. Flag inconsistencies in prop interfaces, naming patterns, error handling approaches, or conditional rendering strategies.
+6. **Validate feature claims (AC Validation)**: For each feature/change claimed in the PR doc (from Step 1's claim list), search the implementation for evidence and classify:
+   - **VERIFIED**: Feature is fully implemented as described
+   - **PARTIAL**: Feature exists but is incomplete or doesn't match the description
+   - **NOT_VERIFIED**: No evidence found in the actual code
+   - PARTIAL and NOT_VERIFIED are HIGH severity findings — feed into the verification table in Step 2's output.
+7. **Audit test quality**: If the PR includes test files, verify they contain real assertions — not placeholder `expect(true).toBe(true)` or empty test bodies. Check that tests actually exercise the changed logic, not just import the module. Missing tests for new utility functions or complex logic = a finding.
+8. **Classify findings** on both axes: Fix-Self or Pass-to-Creator (who fixes it) AND 🔴 HIGH / 🟡 MEDIUM / 🟢 LOW (severity). See the Classification Framework below.
+9. **Record evidence**: Every finding must include file:line references and either a code snippet or a concrete description of the issue. No vague "could be improved" statements.
+
+**This step should produce the bulk of the review findings**. If it produces fewer than 3 findings for a non-trivial PR, proceed to Step 6 for re-examination.
+
+### Step 5: Triage CodeRabbit Comments (Demoted)
+
+**If CodeRabbit comments exist** (both Actionable and Nitpick):
+
+For each comment **individually**, read `references/coderabbit-triage-guide.md` and:
+
+1. Read the actual code at the referenced file and line range
+2. Determine if the issue **still exists** in current code
+3. Apply **scope-aware triage**: if the comment targets an OUT_OF_SCOPE file, dismiss with "스코프 외" reason
+4. Classify using the decision tree:
+
+**Important**: Every comment must appear as an individual row in the triage tables (Fix-Self, Pass-to-Creator, or Dismissed). Do NOT bulk-dismiss comments without per-comment entries. The consolidated footer (for 5+ scope dismissals) is an _additional_ summary footnote — it does not replace individual rows in the Dismissed table.
+
+```
+Is the issue still present in current code?
+├── No → DISMISSED: "이후 커밋에서 이미 수정됨"
+└── Yes
+    ├── Is the file OUT_OF_SCOPE?
+    │   └── Yes → DISMISSED: "스코프 외 ([TICKET] 커밋 소속)"
+    │       Exception: obvious bugs still flagged
+    ├── Does this contradict a project convention in CLAUDE.md?
+    │   └── Yes → DISMISSED: "프로젝트 컨벤션과 상충"
+    └── Is the fix mechanical?
+        ├── Yes → FIX-SELF + severity (HIGH/MEDIUM/LOW)
+        └── No → Would the developer learn something?
+            ├── Yes → PASS-TO-CREATOR + severity (HIGH/MEDIUM/LOW)
+            └── No → FIX-SELF + severity (HIGH/MEDIUM/LOW)
+```
+
+**If CodeRabbit has 0 comments**: Follow the Zero CodeRabbit Comments Protocol in `references/coderabbit-triage-guide.md`. State clearly in the review and move on — the review's substance comes from Step 4.
+
+### Step 6: Minimum Issue Check (NEW)
+
+If the PR is non-trivial (3+ IN_SCOPE files with meaningful logic) and Steps 4-5 combined produced fewer than 3 HIGH+MEDIUM findings:
+
+1. Load `references/review-criteria.md` Section K
+2. Re-examine using the checklist: edge cases, sibling consistency, integration points, test coverage, missing error states
+3. If new findings emerge, add them to the review
+4. If re-examination finds nothing: state "코드 품질이 양호합니다" with confidence (don't invent fake issues)
+5. For trivial PRs (< 3 files, simple logic): skip this step entirely
+
+### Step 7: Check Developer History
+
+1. Read `docs/reviews/developers/<github-id>.md` if it exists
+2. Look for **recurring patterns** that match current findings
+3. If a category has 3+ entries: adjust feedback tone — still kind, but more direct:
+   - "이 패턴이 이전 PR들에서도 나타났습니다. 이번에 확실히 익혀봅시다."
+4. Note recurring strengths for the praise section
+
+### Step 8: Generate Review Document
+
+Load `references/feedback-templates.md` for Korean phrasing. Compose the review following the output template below. Save to:
+
+```
+docs/reviews/[TICKET-ID]-review.md
+```
+
+Present a summary to Eddie in the conversation after saving.
+
+### Step 9: Update Developer Profile
+
+Create or update `docs/reviews/developers/<github-id>.md`:
+
+1. Increment review count, update last review date
+2. For each Pass-to-Creator finding: add a categorized entry with date, ticket, description, file:line
+3. For notable Fix-Self findings (not pure formatting): add entry too
+4. Update "주요 강점" and "주의 영역" summary based on accumulated data
+
+### Step 10: Reviewer Fix-Forward (Conditional)
+
+This step activates when the reviewer decides to fix issues directly instead of waiting for the PR creator. Common triggers include: "직접 수정", "내가 고칠게", "시간이 없어서 내가 수정", "fix it myself", "fix-forward".
+
+1. Apply fixes to the codebase based on the review findings (both Fix-Self and Pass-to-Creator items)
+2. Run `pnpm typecheck` to verify all fixes pass
+3. Load `references/fix-forward-template.md` for the appendable section format
+4. Append the fix log to the **existing** review document (`docs/reviews/[TICKET-ID]-review.md`)
+5. Use `Round 1` for the first fix pass; increment to `Round 2`, `Round 3` etc. if new issues arise after pushing fixes (e.g., new CodeRabbit comments)
+6. The `{reviewer_github_id}'s Comment` section is **mandatory** — it serves as the copy-pasteable PR comment for the author. The `피드백` subsection within it is also mandatory to preserve educational value even when the reviewer fixes things directly
+7. Present a summary to Eddie in the conversation after appending
+
+### Step 11: Auto Review Pipeline (`--auto` mode only)
+
+When invoked with `--auto <PR#>`, execute the full pipeline end-to-end. All scripts are in `.claude/skills/pr-review/scripts/`.
+
+#### Phase A: Fetch PR Data
+
+1. Run `scripts/fetch-pr.sh <PR#>` to fetch PR metadata, CodeRabbit walkthrough, and reviews from GitHub
+2. The script outputs the saved file path on the last line — capture it as the PR doc path
+3. Extract branch name and GitHub ID from the fetched PR metadata:
+   ```bash
+   BRANCH=$(gh pr view <PR#> --json headRefName --jq .headRefName)
+   GITHUB_ID=$(gh pr view <PR#> --json author --jq .author.login)
+   ```
+4. Checkout the PR branch: `git checkout <BRANCH> && git pull`
+
+#### Phase B: Full Review + Fix-Forward
+
+1. Run **Steps 1-9** (Full Review mode) using the fetched PR doc, branch, and GitHub ID
+2. Immediately proceed to **Step 10** (Fix-Forward) — apply all Fix-Self fixes
+3. Run `pnpm typecheck` to verify fixes pass
+4. **Pause for Eddie's confirmation** before proceeding to Phase C:
+   - Present the review summary and fix-forward results
+   - Show the list of Fix-Self vs Pass-to-Creator items
+   - Ask: "Fixes verified. Proceed with commit, push, and CodeRabbit replies?"
+
+#### Phase C: Commit, Push, and Reply
+
+After Eddie confirms:
+
+1. **Commit fixes**:
+   ```bash
+   git add -A
+   git commit -m "[TICKET-ID] fix: apply pr-review fix-forward (Round N)"
+   ```
+2. **Push** to the PR branch: `git push`
+3. **Generate decisions JSON** from the review document:
+   - For each CodeRabbit inline comment found in the triage:
+     - Fix-Self items → `{"comment_id": N, "verdict": "accept", "reason": "..."}`
+     - Pass-to-Creator items → `{"comment_id": N, "verdict": "accept", "reason": "..."}` (still accepted — we agree with the finding)
+     - Dismissed items → `{"comment_id": N, "verdict": "decline", "reason": "..."}`
+   - Save as a temp JSON file (e.g., `/tmp/pr-<PR#>-decisions.json`)
+4. **Post replies**: Run `scripts/post-review-comments.sh <PR#> <decisions.json>`
+5. **Resolve threads**: Run `scripts/resolve-threads.sh <PR#> <decisions.json>`
+6. **Clean up** the temp decisions file
+
+#### Phase D: Summary
+
+Present final status:
+
+- Review document location
+- Fix-forward commit SHA
+- CodeRabbit replies posted (accepted/declined counts)
+- Threads resolved count
+- Any Pass-to-Creator items that need the developer's attention
+
+#### Error Handling
+
+- If `fetch-pr.sh` fails (e.g., PR not found): abort with error message
+- If `pnpm typecheck` fails after fixes: do NOT commit — report the failure and let Eddie fix manually
+- If `post-review-comments.sh` or `resolve-threads.sh` fail partially: report which succeeded/failed, continue with remaining steps
+- If the PR has 0 CodeRabbit inline comments: skip Phases C3-C5 (no decisions to post)
+
+---
+
+## Classification Framework
+
+Every finding is classified on **two orthogonal axes**:
+
+### Axis 1: Who Fixes It?
+
+The guiding principle: **"Would fixing this myself teach the developer nothing, or would explaining it teach them something valuable?"**
+
+**Fix-Self** (reviewer fixes directly) — mechanical, no learning opportunity lost:
+
+- Missing semicolons, extra blank lines, formatting issues
+- Adding `aria-label` to icon-only buttons
+- Conditional rendering guard (`{memo && <p>...</p>}`)
+- Reformatting a cramped function signature onto multiple lines
+- Removing dead constants (e.g. `IS_EDIT_MODE = false` that's never truly toggled)
+- Fixing a one-line null check or fallback
+
+**Pass-to-Creator** (developer should fix to learn) — the developer gains something:
+
+- `useEffect` with incorrect dependency array — understanding React's reactivity model
+- Modal close-before-mutation pattern — understanding async UX flow
+- Ambient type declaration vs explicit module export — understanding TypeScript module system
+- Silent fallback for unknown enum values — understanding defensive error handling strategy
+- Pure utility function inline in a component file — understanding FSD code organization
+- Type inconsistency across sibling components — understanding prop contract design
+
+### Axis 2: Severity
+
+| Severity  | Criteria                                                                                           | Merge Impact                                       |
+| --------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| 🔴 HIGH   | Runtime crash, data loss, security vulnerability, broken feature, wrong behavior                   | **Blocks merge** — must fix before approval        |
+| 🟡 MEDIUM | Missing error handling, incorrect types, FSD violation, silent failures, incomplete implementation | **Should fix** — strongly recommended before merge |
+| 🟢 LOW    | Style improvement, minor accessibility gap, extractable utility, naming inconsistency              | **Nice to fix** — can merge with follow-up         |
+
+### Combined Examples
+
+| Finding                                     | Who             | Severity  | Why                                                 |
+| ------------------------------------------- | --------------- | --------- | --------------------------------------------------- |
+| Null dereference when API returns empty     | Fix-Self        | 🔴 HIGH   | Crash risk, mechanical one-line fix                 |
+| `useEffect` missing `placeData` in deps     | Pass-to-Creator | 🔴 HIGH   | Stale data bug, developer needs to learn reactivity |
+| `safeResponseJson` not used in catch block  | Fix-Self        | 🟡 MEDIUM | Silent failure on empty body, easy to fix           |
+| Silent `?? 'bus'` fallback for unknown enum | Pass-to-Creator | 🟡 MEDIUM | Hides backend changes, teaches defensive strategy   |
+| Missing `aria-label` on icon button         | Fix-Self        | 🟢 LOW    | Accessibility gap, mechanical addition              |
+| Utility function could move to `lib/`       | Pass-to-Creator | 🟢 LOW    | FSD organization, learning opportunity              |
+
+---
+
+## Output Template
+
+Use this exact structure for the review document:
+
+```markdown
+# PR Review: [TICKET-ID] Title
+
+**리뷰어**: Eddie | **작성자**: @github-id | **날짜**: YYYY/MM/DD
+**브랜치**: branch-name | **리뷰 난이도**: [1-5] | **소요 시간**: ~N분
+
+---
+
+## 요약 (Summary)
+
+[2-3 sentences. Always start with something positive. Then overall assessment.]
+
+## 스코프 확인 (Scope Note)
+
+[Only include if OUT_OF_SCOPE files exist. Otherwise omit this section entirely.]
+
+> 📌 이 브랜치에는 [TICKET-ID] 외 다른 티켓의 커밋이 포함되어 있습니다.
+> 본 리뷰는 [TICKET-ID] 스코프의 파일([N]개)에 집중하고, 스코프 외 파일([M]개)은 skim 수준으로 확인했습니다.
+
+## PR 기술 검증 (Git-Truth Validation)
+
+| PR 문서 주장      | 실제 코드             | 일치 여부 |
+| ----------------- | --------------------- | --------- |
+| [Feature claim 1] | [Verification result] | ✅/❌/⚠️  |
+
+[Brief note if discrepancies found, otherwise: "PR 문서와 실제 코드가 일치합니다."]
+
+## 코드 리뷰 결과 (Code Review Findings) ← PRIMARY
+
+**총 X건**: 🔴 HIGH A건 / 🟡 MEDIUM B건 / 🟢 LOW C건
+
+### ✅ 내가 직접 수정 (I'll fix) — X건
+
+| #   | 심각도 | 파일        | 내용       | 수정 방법        |
+| --- | ------ | ----------- | ---------- | ---------------- |
+| 1   | 🔴     | `path:line` | 한 줄 설명 | 구체적 수정 내용 |
+
+### 📚 작성자에게 전달 (Pass to creator) — Y건
+
+#### 🔴 [카테고리: e.g., React Patterns]
+
+**파일**: `path/to/file.tsx:52-54`
+**심각도**: 🔴 HIGH — [merge 영향: e.g., "머지 전 수정 필요"]
+**문제**: [무엇이 문제인지 — 간결하게]
+**이유**: [왜 이것이 중요한지 — 교육적 설명]
+**제안**: [어떻게 고치면 좋은지 — 구체적 코드 예시 포함]
+
+---
+
+## CodeRabbit 코멘트 검증 (Triage) ← SECONDARY
+
+[If Quick Review mode: OMIT THIS ENTIRE SECTION — do not render it at all.]
+
+[If 0 comments:]
+
+> CodeRabbit 코멘트가 없습니다 (Free 플랜 제한 또는 미설정).
+> 본 리뷰는 코드 직접 분석을 기반으로 작성되었습니다.
+
+[If comments exist:]
+**총 N건**: Fix-Self X건 / Pass-to-Creator Y건 / Dismissed Z건
+
+### ✅ 내가 직접 수정 (I'll fix) — X건
+
+| #   | 심각도 | 파일        | 내용       | 수정 방법        |
+| --- | ------ | ----------- | ---------- | ---------------- |
+| 1   | 🟡     | `path:line` | 한 줄 설명 | 구체적 수정 내용 |
+
+### 📚 작성자에게 전달 (Pass to creator) — Y건
+
+[Same educational format as code review findings, with 심각도 field]
+
+### ❌ 기각 (Dismissed) — Z건
+
+| #   | 파일   | CodeRabbit 의견 | 기각 사유 |
+| --- | ------ | --------------- | --------- |
+| 1   | `path` | 요약            | 사유      |
+
+[If 5+ scope dismissals, use consolidated footer format]
+
+## 작성자 피드백 (Feedback for @github-id)
+
+### 잘한 점 (Strengths)
+
+- [구체적인 칭찬 — 무엇을 잘했는지 명시]
+- [다른 팀원이 참고할 만한 좋은 패턴이 있다면 언급]
+
+### 학습 포인트 (Learning Points)
+
+[Pass-to-Creator 항목들을 교육적으로 재정리. 패턴별 그룹핑.]
+
+> 💡 **[패턴 이름]**
+> [왜 이것이 중요한지 2-3문장 설명]
+> [코드 예시가 있으면 포함]
+
+### 다음 PR에서 신경 쓸 점
+
+1. [구체적이고 실행 가능한 조언 — "~를 제출 전에 확인해보세요"]
+2. [선택적 두 번째 조언]
+```
+
+---
+
+## Difficulty Scale
+
+| 난이도 | 기준                                                | 예시                                 |
+| ------ | --------------------------------------------------- | ------------------------------------ |
+| 1      | 파일 1-2개, 단순 UI 수정, 로직 변경 없음            | 텍스트 변경, 스타일 수정             |
+| 2      | 파일 3-5개, 단일 기능 구현, 명확한 패턴             | 새 컴포넌트 1개 추가, API 연결       |
+| 3      | 파일 5-10개, 기존 구조 리팩토링 또는 여러 기능 수정 | 컴포넌트 분리, 상태 관리 변경        |
+| 4      | 파일 10+개, 아키텍처 변경, 여러 레이어 영향         | FSD 레이어 재구성, 인증 흐름 변경    |
+| 5      | 대규모 리팩토링, 브레이킹 체인지, 크로스-앱 영향    | 브릿지 스키마 변경, 빌드 시스템 변경 |
+
+---
+
+## Korean Feedback Tone Guide
+
+Two modes, mixed as appropriate:
+
+**교육적 (Educational)** — for architecture, patterns, and "why" explanations:
+
+- 선배 개발자가 후배에게 설명하는 느낌
+- "이 패턴을 사용하면 ~ 때문에 향후 유지보수가 어려워질 수 있어요."
+- "React에서 useEffect의 dependency array는 ~ 역할을 하는데..."
+- Always explain the "why", not just the "what"
+
+**간결 (Concise)** — for small, obvious fixes:
+
+- "세미콜론 누락"
+- "`aria-label` 추가 권장"
+- "빈 태그 렌더링 방지 필요"
+
+**Tone rules:**
+
+- Always lead with something positive in the 잘한 점 section
+- Never use harsh language ("잘못했다", "이해를 못한 것 같다")
+- Frame mistakes as growth: "이 부분을 알게 되면 다음부터 훨씬 수월해질 거예요"
+- If recurring issue (3+ times): be direct but still kind: "이 패턴이 계속 나오고 있어요. 이번에 확실히 정리해봅시다."
+
+For detailed phrase templates, read `references/feedback-templates.md`.
+
+---
+
+## Developer Tracking
+
+### File Location
+
+```
+docs/reviews/developers/<github-id>.md
+```
+
+### File Format
+
+```markdown
+# Developer Profile: @github-id
+
+## 통계 (Statistics)
+
+- 총 리뷰 횟수: N
+- 마지막 리뷰: YYYY/MM/DD
+- 주요 강점: [comma-separated areas]
+- 주의 영역: [comma-separated areas]
+
+## 리뷰 이력 (Review History)
+
+### YYYY/MM/DD - [TICKET-ID] Title
+
+**전체 평가**: [1-2 sentence summary]
+**발견 건수**: Fix-Self N건, Pass-to-Creator N건, Dismissed N건
+
+## 카테고리별 이력 (History by Category)
+
+### Code Style & Formatting
+
+- [YYYY/MM/DD] [TICKET] description (file:line) [Fix-Self/Pass-to-Creator]
+
+### Type Safety & TypeScript
+
+### React Patterns
+
+### Accessibility
+
+### Architecture / FSD Compliance
+
+### Error Handling
+
+### Performance
+
+### DRY / Code Duplication
+```
+
+### Update Rules
+
+- **New developer**: Create file from template, populate all sections
+- **Existing developer**: Append to Review History and Category sections, update Statistics
+- **Category with 0 entries**: Keep the heading but leave empty (don't delete categories)
+- **Strengths/Watch areas**: Re-derive from the full category history each time
+
+---
+
+## Reference Files
+
+Load these on demand during the workflow:
+
+| Reference                               | When to Load     | Purpose                                                                   |
+| --------------------------------------- | ---------------- | ------------------------------------------------------------------------- |
+| `references/review-criteria.md`         | Steps 2, 4, 6    | Git-truth validation (J), code review checklist (A-I), re-examination (K) |
+| `references/feedback-templates.md`      | Step 8           | Korean phrase templates for writing feedback                              |
+| `references/coderabbit-triage-guide.md` | Step 5           | How to parse, classify, and scope-triage CodeRabbit comments              |
+| `references/fix-forward-template.md`    | Step 10          | Appendable fix log template with 수정/미수정 tables and PR comment format |
+| `scripts/fetch-pr.sh`                   | Step 11, Phase A | Fetches PR data from GitHub API, saves to `docs/pr-for-review/`           |
+| `scripts/post-review-comments.sh`       | Step 11, Phase C | Posts accept/decline replies to CodeRabbit inline comments                |
+| `scripts/resolve-threads.sh`            | Step 11, Phase C | Resolves accepted CodeRabbit threads via GraphQL                          |
+
+These files contain detailed content that should not be loaded upfront. Read them only at the step indicated.
+
+Also always reference:
+
+- `CLAUDE.md` (already in context) — the authoritative source for project coding conventions
+- `.coderabbit.yaml` — CodeRabbit configuration for understanding its review profile and path-specific rules

@@ -1,0 +1,80 @@
+{
+  "skill_name": "pr-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "ACME-595 PR 리뷰해줘. docs/pr-for-review/[ACME-595] 일정카드 모드별 컴포넌트 분리.md 파일이고, 브랜치는 ACME-595/split-place-card, 작성자는 seyoonagain이야.",
+      "expected_output": "A structured review document saved to docs/reviews/ACME-595-review.md with git-truth validation, scope-aware deep code review as primary section, CodeRabbit triage (12 actionable + 13 nitpick comments classified) as secondary section, and developer feedback in Korean. Developer profile created at docs/reviews/developers/seyoonagain.md.",
+      "files": [
+        "docs/pr-for-review/[ACME-595] 일정카드 모드별 컴포넌트 분리.md"
+      ],
+      "expectations": [
+        "Review document saved to docs/reviews/ACME-595-review.md",
+        "Developer profile created at docs/reviews/developers/seyoonagain.md",
+        "Review contains 스코프 확인 section if OUT_OF_SCOPE files detected, or omits it cleanly if all files are in-scope",
+        "Review contains PR 기술 검증 section with a verification table comparing PR claims to actual git diff",
+        "코드 리뷰 결과 section appears ABOVE CodeRabbit 코멘트 검증 section (code review is primary)",
+        "코드 리뷰 결과 contains at least 3 substantive findings from independent code analysis",
+        "Findings use dual classification: Fix-Self/Pass-to-Creator AND severity (🔴 HIGH / 🟡 MEDIUM / 🟢 LOW)",
+        "코드 리뷰 결과 section includes severity summary line (총 X건: 🔴 HIGH A건 / 🟡 MEDIUM B건 / 🟢 LOW C건)",
+        "Review triages at least 20 of 25 CodeRabbit comments (12 actionable + 13 nitpick) in the secondary section",
+        "Review contains all three triage categories: Fix-Self, Pass-to-Creator, and Dismissed",
+        "Fix-Self items include severity emoji and concrete one-line fix descriptions (not vague)",
+        "Pass-to-Creator items include severity level, educational Korean explanations with 심각도/문제/이유/제안 structure",
+        "Feedback section contains 잘한 점 (Strengths) before 학습 포인트 (Learning Points)",
+        "Developer profile has categorized entries (at least 3 distinct categories like React Patterns, Type Safety, etc.)",
+        "Review shows evidence of reading actual source code (file:line references, code snippets, not just PR doc parroting)",
+        "Korean language used for all feedback with English technical terms preserved",
+        "Difficulty scale (리뷰 난이도) is calibrated: 1-5 with clear justification"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Review the PR at docs/pr-for-review/[ACME-452] 내가 작성한 리뷰 목록 조회 api 연결.md. Branch is ACME-452/my-reviews-api. Creator: 626-ju.",
+      "expected_output": "A full review with substantive code findings despite 0 CodeRabbit comments. The review's substance comes from independent deep code analysis (Step 4), not CodeRabbit triage. Git-truth validation table present. Developer profile created.",
+      "files": [
+        "docs/pr-for-review/[ACME-452] 내가 작성한 리뷰 목록 조회 api 연결.md"
+      ],
+      "expectations": [
+        "Review document saved to docs/reviews/ACME-452-review.md",
+        "Developer profile created/updated at docs/reviews/developers/626-ju.md",
+        "Review contains PR 기술 검증 section with git-truth validation table",
+        "코드 리뷰 결과 section contains substantive findings (at least 2) from independent code analysis with severity classification — NOT hollow",
+        "CodeRabbit 코멘트 검증 section gracefully handles 0 comments with exact phrasing: CodeRabbit 코멘트가 없습니다",
+        "Review does NOT treat 0 CodeRabbit comments as a blocker — substance comes from code review",
+        "Review shows evidence of reading actual source code (file:line references, specific code critique)",
+        "코드 리뷰 결과 section appears ABOVE CodeRabbit 코멘트 검증 section",
+        "Korean language used for all feedback with English technical terms preserved"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "seyoonagain 개발자의 리뷰 이력 보여줘",
+      "expected_output": "Display the developer profile for seyoonagain showing review history, statistics, category breakdown, strengths, and areas to watch.",
+      "files": [],
+      "expectations": [
+        "Reads and references docs/reviews/developers/seyoonagain.md",
+        "Shows review count and last review date",
+        "Shows strengths and watch areas for the developer",
+        "Shows category-by-category history breakdown (at least 3 categories displayed)"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "ACME-595 PR 퀵 리뷰해줘 --quick. docs/pr-for-review/[ACME-595] 일정카드 모드별 컴포넌트 분리.md 파일이고, 브랜치는 ACME-595/split-place-card, 작성자는 seyoonagain이야.",
+      "expected_output": "A quick review with git-truth validation and deep code review but NO CodeRabbit triage section and NO developer history update. Faster and more focused output.",
+      "files": [
+        "docs/pr-for-review/[ACME-595] 일정카드 모드별 컴포넌트 분리.md"
+      ],
+      "expectations": [
+        "Review document saved to docs/reviews/ACME-595-review.md",
+        "Review contains PR 기술 검증 section with verification table",
+        "코드 리뷰 결과 section contains substantive findings from independent code analysis",
+        "Review does NOT contain a CodeRabbit 코멘트 검증 section (skipped in quick mode)",
+        "Review does NOT create or update developer profile (skipped in quick mode)",
+        "Review is shorter than a full review — focused on code findings only",
+        "Korean language used for all feedback with English technical terms preserved"
+      ]
+    }
+  ]
+}
