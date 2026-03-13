@@ -2,7 +2,25 @@
 
 AI-powered PR review pipeline for [Claude Code](https://claude.ai/claude-code). It turns 30-45 minute PR reviews into structured reviews with deep code analysis, provider-aware AI review triage, fix-forward support, and educational developer feedback.
 
-The skill now supports both **GitHub Copilot review** and **CodeRabbit**. Direct code review remains the primary output; AI review triage is secondary.
+## Killer Feature
+
+The killer feature is **automated PR review that combines direct code review with GitHub Copilot and CodeRabbit comment handling in one flow**.
+
+Use one command:
+
+```bash
+/pr-review --auto 161 --review-source all
+```
+
+What that pipeline gives you:
+- fetch the PR directly from GitHub
+- run independent deep code review on the actual diff
+- triage **GitHub Copilot** and **CodeRabbit** comments together
+- separate provider-specific feedback cleanly
+- support fix-forward workflow
+- preview reply/resolve actions safely with `--dry-run`
+
+Direct code review remains the primary output. AI review triage is secondary.
 
 - Team rollout note: [TEAM-USAGE.md](/Users/eddie/Desktop/eddiesohn/pr/TEAM-USAGE.md)
 
@@ -31,7 +49,7 @@ brew install jq
 Without `gh`, auto mode (`--auto`) and script-based features won't work. You can still run reviews manually by saving the PR content to a local markdown file and providing the path:
 
 ```
-/pr-review:pr-review path/to/saved-pr.md --quick
+/pr-review path/to/saved-pr.md --quick
 ```
 
 ```bash
@@ -81,24 +99,28 @@ Version changes in [`.claude-plugin/plugin.json`](/Users/eddie/Desktop/eddiesohn
 
 ## Usage
 
-Once installed, the skill triggers when you mention reviewing a PR, or you can invoke it directly:
+Once installed, use `/pr-review` directly:
 
 ```
 # Full review from a PR document
-/pr-review:pr-review docs/pr-for-review/[TICKET-ID] description.md
+/pr-review docs/pr-for-review/[TICKET-ID] description.md
 
 # Full review from GitHub with provider selection
-/pr-review:pr-review https://github.com/owner/repo/pull/161 --review-source copilot
+/pr-review https://github.com/owner/repo/pull/161 --review-source copilot
 
 # Quick review (skip AI triage entirely)
-/pr-review:pr-review docs/pr-for-review/[TICKET-ID] description.md --quick
+/pr-review docs/pr-for-review/[TICKET-ID] description.md --quick
 
 # Mixed-provider review
-/pr-review:pr-review https://github.com/owner/repo/pull/161 --review-source all
+/pr-review https://github.com/owner/repo/pull/161 --review-source all
 
 # Auto mode: fetch, review, fix-forward, then pause before commit/push/reply
-/pr-review:pr-review --auto 123 --review-source all
+/pr-review --auto 123 --review-source all
 ```
+
+If Claude Code auto-triggers the skill from natural language, that also works. `/pr-review` is just the most reliable explicit entrypoint.
+
+Do not rely on `/pr-review:pr-review` for flag-heavy usage. The supported command entrypoint is `/pr-review`.
 
 ### Modes
 
@@ -126,7 +148,7 @@ Use this when you want the full pipeline but do **not** want to post anything ye
 
 ```bash
 # 1. Run auto review and stop before live GitHub mutations
-/pr-review:pr-review --auto 161 --review-source all
+/pr-review --auto 161 --review-source all
 
 # 2. Preview planned replies / resolutions from the generated decisions file
 skills/pr-review/scripts/post-ai-review-comments.sh 161 /tmp/pr-161-decisions.json --dry-run
