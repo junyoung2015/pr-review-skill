@@ -19,6 +19,8 @@ The format is based on Keep a Changelog and the project follows Semantic Version
 
 ## [0.2.0] - 2026-03-13
 
+> Release title: Copilot-aware PR review workflow
+
 ### Added
 - GitHub Copilot review support alongside existing CodeRabbit handling.
 - Provider-neutral scripts for replying to AI review comments and resolving AI review threads.
@@ -31,6 +33,8 @@ The format is based on Keep a Changelog and the project follows Semantic Version
 - Plugin metadata and marketplace metadata now describe Copilot-aware review behavior.
 
 ## [0.1.0] - 2026-03-12
+
+> Release title: Initial PR review skill release
 
 ### Added
 - Initial plugin release for PR review, CodeRabbit triage, fix-forward workflow, and developer feedback tracking.
