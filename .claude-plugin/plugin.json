@@ -1,7 +1,7 @@
 {
   "name": "pr-review",
-  "description": "AI-powered PR review pipeline - deep code analysis, CodeRabbit triage, fix-forward, educational feedback, and developer growth tracking. Turns 30-45 min reviews into ~8 min structured reviews.",
-  "version": "0.1.0",
+  "description": "AI-powered PR review pipeline - deep code analysis, GitHub Copilot and CodeRabbit triage, fix-forward, educational feedback, and developer growth tracking.",
+  "version": "0.2.0",
   "author": {
     "name": "Jun Young Sohn",
     "url": "https://github.com/junyoung2015"
@@ -15,6 +15,7 @@
   "keywords": [
     "pr-review",
     "code-review",
+    "copilot",
     "coderabbit",
     "fix-forward",
     "developer-feedback"
