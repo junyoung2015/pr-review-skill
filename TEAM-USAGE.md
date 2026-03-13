@@ -6,15 +6,15 @@ Use this skill in three tiers:
    - Fastest path when you only want direct code findings.
    - Example:
      ```bash
-     /pr-review:pr-review https://github.com/demodev-lab/moving-frontend/pull/161 --quick
+     /pr-review https://github.com/demodev-lab/moving-frontend/pull/161 --quick
      ```
 
 2. **Provider-aware review**
    - Use this when the PR has GitHub Copilot review, CodeRabbit, or both.
    - Examples:
      ```bash
-     /pr-review:pr-review https://github.com/demodev-lab/moving-frontend/pull/161 --review-source copilot
-     /pr-review:pr-review https://github.com/demodev-lab/moving-frontend/pull/161 --review-source all
+     /pr-review https://github.com/demodev-lab/moving-frontend/pull/161 --review-source copilot
+     /pr-review https://github.com/demodev-lab/moving-frontend/pull/161 --review-source all
      ```
 
 3. **Auto review**
@@ -22,7 +22,7 @@ Use this skill in three tiers:
    - The workflow should still pause before commit / push / live GitHub reply actions.
    - Example:
      ```bash
-     /pr-review:pr-review --auto 161 --review-source all
+     /pr-review --auto 161 --review-source all
      ```
 
 ## Safe rollout rule
