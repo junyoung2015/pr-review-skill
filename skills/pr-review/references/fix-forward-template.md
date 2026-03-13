@@ -21,7 +21,7 @@ Append the following to the **end** of the existing review document (`docs/revie
 ### Round Numbering
 
 - First time fixing: `Round 1`
-- If new CodeRabbit comments or issues arise after Round 1 fixes: `Round 2`
+- If new GitHub Copilot / CodeRabbit comments or issues arise after Round 1 fixes: `Round 2`
 - Continue incrementing for subsequent rounds
 
 ### Markdown Template
@@ -89,7 +89,7 @@ Append the following to the **end** of the existing review document (`docs/revie
 | `#` | Sequential number | 1-indexed |
 | `파일` | `` `path/to/file.tsx` `` | Backtick-wrapped |
 | `원래 내용` | Free text | Original review finding that was not fixed |
-| `미수정 사유` | Free text | Why it was not fixed (e.g., "CodeRabbit 오판", "별도 티켓으로 분리 권장", "API 미연결 상태로 수정 불가") |
+| `미수정 사유` | Free text | Why it was not fixed (e.g., "AI 리뷰 오판", "별도 티켓으로 분리 권장", "API 미연결 상태로 수정 불가") |
 | `검증 방법` | Free text | How the skip-decision was verified (e.g., "`pnpm typecheck` 제거 시 실패 확인", "`grep -rn TravelMode` 사용처 확인") |
 
 ### Comment Section
@@ -147,5 +147,5 @@ Append the following to the **end** of the existing review document (`docs/revie
 
 | # | 파일 | 원래 내용 | 미수정 사유 | 검증 방법 |
 |---|------|----------|-----------|----------|
-| 1 | `completed-trip-transportation-route.tsx` | `type TravelMode` import 제거 | CodeRabbit 오판: 내부 `TransportationStop` prop에서 실사용 중 | `pnpm typecheck` — import 제거 시 타입 에러 발생 확인 |
+| 1 | `completed-trip-transportation-route.tsx` | `type TravelMode` import 제거 | AI 리뷰 오판: 내부 `TransportationStop` prop에서 실사용 중 | `pnpm typecheck` — import 제거 시 타입 에러 발생 확인 |
 ```
