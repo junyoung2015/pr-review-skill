@@ -179,6 +179,7 @@ Recommended release flow:
 1. Update the plugin version in `plugin.json`
 2. Sync the same version in `marketplace.json`
 3. Add a matching section to `CHANGELOG.md`
+   Include an optional line like `> Release title: Copilot-aware PR review workflow` directly under the version header if you want a custom GitHub Release title. Otherwise the workflow falls back to the raw tag name.
 4. Merge to `main`
 5. Create and push a git tag like `v0.2.0`
 6. Let GitHub Actions validate and publish the GitHub Release
