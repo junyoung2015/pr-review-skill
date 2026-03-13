@@ -1,6 +1,6 @@
 # PR Review Criteria Checklist
 
-This checklist is derived from CLAUDE.md project conventions and .coderabbit.yaml path-specific rules. Walk through each section for every changed file.
+This checklist is derived from CLAUDE.md project conventions, .coderabbit.yaml path-specific rules, and GitHub Copilot review instructions under `.github/copilot-instructions.md` / `.github/instructions/**/*.instructions.md`. Walk through each section for every changed file.
 
 ---
 
