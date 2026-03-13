@@ -52,16 +52,28 @@ jobs:
           test "$tag" = "$plugin_version"
 
       - name: Extract release notes from changelog
+        id: changelog
         run: |
           tag="${GITHUB_REF_NAME#v}"
-          awk -v ver="$tag" '
+          section="$(awk -v ver="$tag" '
             $0 ~ "^## \\[" ver "\\]" {flag=1; next}
             flag && $0 ~ "^## \\[" {exit}
             flag {print}
-          ' CHANGELOG.md | sed '/^[[:space:]]*$/N;/^\n$/D' > RELEASE_NOTES.md
+          ' CHANGELOG.md)"
+
+          release_title="$(printf '%s\n' "$section" | sed -n 's/^> Release title: //p' | head -n 1)"
+          if [ -z "$release_title" ]; then
+            release_title="$GITHUB_REF_NAME"
+          else
+            release_title="$GITHUB_REF_NAME - $release_title"
+          fi
+
+          printf 'release_name=%s\n' "$release_title" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$section" | sed '/^> Release title: /d' | sed '/^[[:space:]]*$/N;/^\n$/D' > RELEASE_NOTES.md
           test -s RELEASE_NOTES.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ steps.changelog.outputs.release_name }}
           body_path: RELEASE_NOTES.md
