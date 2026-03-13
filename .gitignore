@@ -17,3 +17,17 @@ temp
 .idea
 .vscode
 .turbo
+.playwright-mcp
+
+####################
+# Custom ignores
+####################
+docs/
+repomix*
+skills/pr-review-workspace/
+
+####################
+# LLM / MCP / Agent
+####################
+.mcp.json
+mcp.json
