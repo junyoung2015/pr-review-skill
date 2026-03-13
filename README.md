@@ -58,6 +58,27 @@ git clone git@github.com:junyoung2015/pr-review-skill.git
 claude --plugin-dir ./pr-review-skill
 ```
 
+## Update an existing install
+
+### If installed as a local plugin
+
+Pull the latest repo changes, then reload plugins or restart Claude Code:
+
+```bash
+git pull
+/reload-plugins
+```
+
+### If installed via marketplace
+
+Update the marketplace metadata first, then refresh the installed plugin in Claude Code:
+
+```text
+/plugin marketplace update <marketplace-name>
+```
+
+Version changes in [`.claude-plugin/plugin.json`](/Users/eddie/Desktop/eddiesohn/pr/.claude-plugin/plugin.json) and [`.claude-plugin/marketplace.json`](/Users/eddie/Desktop/eddiesohn/pr/.claude-plugin/marketplace.json) are what allow Claude Code to detect a new release.
+
 ## Usage
 
 Once installed, the skill triggers when you mention reviewing a PR, or you can invoke it directly:
@@ -143,6 +164,24 @@ If you use GitHub Copilot review on GitHub.com, this repo includes:
 - `.github/instructions/mobile-review.instructions.md`
 
 These guide Copilot toward architecture, runtime correctness, test quality, and meaningful review comments instead of generic style nits.
+
+## Release management
+
+This plugin is currently versioned in the `0.x` range.
+
+- Current plugin version lives in [`.claude-plugin/plugin.json`](/Users/eddie/Desktop/eddiesohn/pr/.claude-plugin/plugin.json)
+- Marketplace version lives in [`.claude-plugin/marketplace.json`](/Users/eddie/Desktop/eddiesohn/pr/.claude-plugin/marketplace.json)
+- Human-readable release notes live in [CHANGELOG.md](/Users/eddie/Desktop/eddiesohn/pr/CHANGELOG.md)
+- Release automation lives in [.github/workflows/release.yml](/Users/eddie/Desktop/eddiesohn/pr/.github/workflows/release.yml)
+
+Recommended release flow:
+
+1. Update the plugin version in `plugin.json`
+2. Sync the same version in `marketplace.json`
+3. Add a matching section to `CHANGELOG.md`
+4. Merge to `main`
+5. Create and push a git tag like `v0.2.0`
+6. Let GitHub Actions validate and publish the GitHub Release
 
 ## License
 
