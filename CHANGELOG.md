@@ -6,18 +6,20 @@ The format is based on Keep a Changelog and the project follows Semantic Version
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-13
+
+> Release title: command wrapper and manifest validation fix
+
 ### Added
-- Release workflow validation for plugin metadata, changelog presence, and review scripts.
-- Dry-run support for AI review reply and thread resolution scripts.
-- GitHub Copilot-specific review instructions and triage guidance.
-- Team usage note for safe rollout and provider-aware review usage.
 - Explicit `/pr-review` command wrapper for passing raw review arguments safely.
 
 ### Changed
-- PR review skill now supports provider-aware AI review triage for GitHub Copilot and CodeRabbit.
-- Fetch pipeline now saves structured `*.review-data.json` sidecars for AI review metadata.
-- README now documents provider-aware review modes, dry-run usage, and safer auto-review guidance.
-- README and rollout docs now position automated provider-aware review as the primary feature.
+- README and rollout docs now position automated provider-aware review as the primary feature and use `/pr-review` as the supported command entrypoint.
+- Plugin and marketplace descriptions now highlight automated review as the primary feature.
+- Plugin manifest `repository` field now uses the format expected by Claude's plugin validator.
+
+### Fixed
+- Fixed marketplace installation failure caused by an invalid `plugin.json` repository field.
 
 ## [0.2.0] - 2026-03-13
 
