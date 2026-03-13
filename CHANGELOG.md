@@ -11,11 +11,13 @@ The format is based on Keep a Changelog and the project follows Semantic Version
 - Dry-run support for AI review reply and thread resolution scripts.
 - GitHub Copilot-specific review instructions and triage guidance.
 - Team usage note for safe rollout and provider-aware review usage.
+- Explicit `/pr-review` command wrapper for passing raw review arguments safely.
 
 ### Changed
 - PR review skill now supports provider-aware AI review triage for GitHub Copilot and CodeRabbit.
 - Fetch pipeline now saves structured `*.review-data.json` sidecars for AI review metadata.
 - README now documents provider-aware review modes, dry-run usage, and safer auto-review guidance.
+- README and rollout docs now position automated provider-aware review as the primary feature.
 
 ## [0.2.0] - 2026-03-13
 
