@@ -1,6 +1,6 @@
 {
   "name": "pr-review",
-  "description": "AI-powered PR review pipeline - deep code analysis, GitHub Copilot and CodeRabbit triage, fix-forward, educational feedback, and developer growth tracking.",
+  "description": "Automated PR review pipeline - deep code review plus GitHub Copilot and CodeRabbit comment triage, fix-forward support, and educational developer feedback.",
   "version": "0.2.0",
   "author": {
     "name": "Jun Young Sohn",
