@@ -5,13 +5,13 @@
     "email": "junyoung.eddie@gmail.com"
   },
   "metadata": {
-    "description": "AI-powered PR review pipeline for Claude Code with Copilot and CodeRabbit support"
+    "description": "Automated PR review pipeline for Claude Code with deep code review plus Copilot and CodeRabbit comment triage"
   },
   "plugins": [
     {
       "name": "pr-review",
       "source": "./",
-      "description": "Deep code-centric PR review with GitHub Copilot and CodeRabbit triage, fix-forward, educational feedback, and developer growth tracking",
+      "description": "Automated PR review with deep code review, GitHub Copilot and CodeRabbit triage, fix-forward, and educational developer feedback",
       "version": "0.2.0"
     }
   ]
