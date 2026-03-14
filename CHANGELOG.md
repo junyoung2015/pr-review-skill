@@ -6,7 +6,7 @@ The format is based on Keep a Changelog and the project follows Semantic Version
 
 ## [Unreleased]
 
-### 0.2.2
+## [0.2.2] - 2026-03-14
 
 > Release title: mixed-provider auto-mode hardening
 
