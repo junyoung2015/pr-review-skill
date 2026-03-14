@@ -6,6 +6,31 @@ The format is based on Keep a Changelog and the project follows Semantic Version
 
 ## [Unreleased]
 
+### 0.2.2
+
+> Release title: mixed-provider auto-mode hardening
+
+#### Added
+- Worktree-aware auto mode with deterministic clean worktree preparation for dirty target repos.
+- Managed Round N review-doc support with structured `round_meta` and `round_decisions` JSON blocks.
+- Provider-neutral decisions artifact generation for mixed GitHub Copilot and CodeRabbit auto mode.
+
+#### Changed
+- Auto mode now requires explicit `--live` confirmation before commit, push, reply, or resolve actions.
+- Auto mode now resolves the target repo and review doc explicitly instead of guessing from operator context.
+- Preview and live mutation steps now run through the same normalized decisions artifact contract.
+- Worktree mode now mirrors the authoritative review doc into the prepared worktree before managed round edits.
+
+#### Fixed
+- Hardened stale-round protection so reply/resolve steps fail rather than mutating older provider review rounds.
+- Hardened rerun behavior so mutation-partial rounds can resume intentionally with persistent per-round artifacts.
+- Hardened missing-`--repo-path` handling so auto mode stops instead of drifting into unrelated repos or worktrees.
+
+#### Release Boundary
+- `0.2.2` is intentionally a supervised automation release: explicit repo resolution, worktree preparation, managed round docs, decisions artifacts, and dry-run previews are in scope.
+- `0.2.2` does not claim autonomous accept/decline judgment or exhaustive live-mutation proof across every edge case.
+- Remaining unchecked live or edge-case acceptance criteria are candidate `0.2.3` scope only if rollout pain clusters around repo or branch mismatch validation, legacy review-doc migration, branch-drift blocking, or broader live reply/resolve proof.
+
 ## [0.2.1] - 2026-03-13
 
 > Release title: command wrapper and manifest validation fix
