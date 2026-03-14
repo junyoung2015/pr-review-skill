@@ -115,6 +115,79 @@
         "Review does NOT attempt developer-history update if quick mode semantics skip it",
         "Review remains focused on direct code findings rather than provider comment triage"
       ]
+    },
+    {
+      "id": 8,
+      "prompt": "/pr-review --auto 161 --review-source all --repo-path /Users/eddie/Desktop/demodev/moving-frontend --review-doc /Users/eddie/Desktop/demodev/moving-frontend/docs/reviews/MOVE-658-review.md 를 dirty repo에서 실행했어. --worktree 는 안 줬어.",
+      "expected_output": "Auto mode should stop safely before fix-forward or GitHub mutation, explain that the target repo is dirty, and recommend rerunning with --worktree auto or an explicit worktree path.",
+      "files": [],
+      "expectations": [
+        "Auto mode validates the explicit repo path against the PR head repo",
+        "The workflow does not stash automatically",
+        "The workflow stops before commit, push, reply, or resolve actions",
+        "The response recommends --worktree auto or --worktree <abs-path>"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "/pr-review --auto 161 --review-source all --repo-path /Users/eddie/Desktop/demodev/moving-frontend --review-doc /Users/eddie/Desktop/demodev/moving-frontend/docs/reviews/MOVE-658-review.md --worktree auto 로 실행해줘.",
+      "expected_output": "Auto mode should prepare or reuse the deterministic clean worktree, create the first review doc at the resolved path if needed, append or resume a managed Round N section in the review doc, and generate artifacts under .pr-review/pr-161/round-N/ before stopping for supervised review.",
+      "files": [],
+      "expectations": [
+        "prepare-pr-worktree.sh is used for deterministic worktree preparation",
+        "If the review doc does not exist yet, the workflow bootstraps it at the returned review_doc_path during Phase B",
+        "The review doc gains a managed Round N section with round_meta and round_decisions JSON blocks",
+        "Artifacts are written under .pr-review/pr-161/round-N/",
+        "The workflow stops after dry-run artifacts unless --live is present"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "PR #161 auto review를 Round 2 기준으로 다시 돌려줘. Copilot은 이전 라운드도 있고 CodeRabbit은 최신 라운드에만 있어. --review-source all, --repo-path /Users/eddie/Desktop/demodev/moving-frontend, --review-doc /Users/eddie/Desktop/demodev/moving-frontend/docs/reviews/MOVE-658-review.md, --worktree auto.",
+      "expected_output": "Only the latest selected provider round(s) should populate round_decisions and the generated decisions artifact. Older Copilot rounds must be treated as stale and excluded.",
+      "files": [],
+      "expectations": [
+        "Copilot latest-round filtering uses pull_request_review_id",
+        "CodeRabbit latest-round filtering uses the latest bot review id",
+        "round_decisions contains only the latest selected provider comments",
+        "The generated decisions artifact rejects stale provider comments"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "/pr-review --auto 161 --review-source all 을 repo 바깥 디렉터리에서 실행했어. --repo-path 도 안 줬고 branch basename 에 ticket 도 애매해.",
+      "expected_output": "Auto mode should fail fast with a clear repo-path error first, and if repo resolution is later fixed but ticket extraction is still ambiguous, it should require --review-doc explicitly.",
+      "files": [],
+      "expectations": [
+        "The workflow never guesses a repo outside the current working directory",
+        "The first failure is an explicit repo-path resolution error",
+        "Ambiguous ticket extraction requires --review-doc",
+        "The workflow does not create or update the wrong review doc"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Round 상태가 mutation-partial 인 PR #161 auto review를 다시 실행해줘. 같은 repo-path, 같은 review-doc, 같은 worktree path를 사용해.",
+      "expected_output": "The workflow should resume the existing managed round instead of creating a new round, reuse the same artifact directory, and allow the round to move from mutation-partial to live-posted on success.",
+      "files": [],
+      "expectations": [
+        "update-review-round-doc.sh resumes the existing mutation-partial round",
+        "prepare-pr-worktree.sh reuses the recorded clean worktree for that round",
+        "Artifact paths remain inside the same .pr-review/pr-<PR>/round-N/ directory",
+        "Only mutation-partial -> live-posted is treated as an automatic resume path"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "/pr-review --auto 161 --review-source all --repo-path /Users/eddie/Desktop/demodev/moving-frontend --review-doc /Users/eddie/Desktop/demodev/moving-frontend/docs/reviews/MOVE-658-review.md --worktree auto --live 로 실행해. round_decisions 에 pending 이 하나 남아 있어.",
+      "expected_output": "Live auto mode must fail before commit, push, reply, or resolve steps because pending decisions remain in the current managed round.",
+      "files": [],
+      "expectations": [
+        "--live requires every selected latest-round decision to be accepted or declined",
+        "No commit or push happens while pending rows exist",
+        "No GitHub replies or thread resolutions are posted while pending rows exist",
+        "The error points the operator back to round_decisions as the canonical source to update"
+      ]
     }
   ]
 }
