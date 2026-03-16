@@ -111,13 +111,7 @@ resolve_review_doc_path() {
   local branch_name="$3"
 
   if [ -n "$explicit_path" ]; then
-    local normalized_explicit_path
-    normalized_explicit_path="$(normalize_path "$explicit_path")"
-    if ! path_within "$repo_path" "$normalized_explicit_path"; then
-      echo "Error: Explicit review doc must live inside the resolved target repo: ${normalized_explicit_path}" >&2
-      return 1
-    fi
-    printf '%s\n' "$normalized_explicit_path"
+    normalize_path "$explicit_path"
     return 0
   fi
 
@@ -158,16 +152,6 @@ compute_round_context() {
   local review_doc_path="$1"
   local pr_number="$2"
 
-  if [ ! -f "$review_doc_path" ]; then
-    jq -n \
-      --argjson round_number 1 \
-      --arg action "new" \
-      --arg status "draft" \
-      --arg artifact_dir ".pr-review/pr-${pr_number}/round-1" \
-      '{round_number: $round_number, action: $action, status: $status, artifact_dir: $artifact_dir, worktree_path: null}'
-    return 0
-  fi
-
   local highest_heading
   highest_heading="$(grep -E '^## .*Round [0-9]+' "$review_doc_path" | sed -E 's/^## .*Round ([0-9]+).*$/\1/' | sort -n | tail -1 || true)"
   if [ -z "$highest_heading" ]; then
@@ -184,7 +168,7 @@ compute_round_context() {
     local last_artifact_dir
     last_artifact_dir="$(printf '%s' "$last_meta" | jq -r '.artifact_dir // empty')"
     local last_worktree_path
-    last_worktree_path="$(printf '%s' "$last_meta" | jq -r '.worktree.worktree_path // .worktree.path // empty')"
+    last_worktree_path="$(printf '%s' "$last_meta" | jq -r '.worktree.path // empty')"
 
     if [ "$last_status" = "mutation-partial" ]; then
       jq -n \
@@ -371,7 +355,10 @@ fi
 
 SOURCE_REPO_PATH="$(normalize_path "$REPO_PATH")"
 SOURCE_DIRTY_JSON=false
-if [ -n "$(git -C "$SOURCE_REPO_PATH" status --porcelain --untracked-files=all)" ]; then
+# Only flag dirty if there are STAGED changes (git diff --cached).
+# Unstaged modifications (e.g. local .gitignore tweaks) are safe — they won't
+# leak into commits as long as fix-forward only git-adds specific files.
+if ! git -C "$SOURCE_REPO_PATH" diff --cached --quiet 2>/dev/null; then
   SOURCE_DIRTY_JSON=true
 fi
 
@@ -438,18 +425,38 @@ if [ "$REMOTE_HEAD_SHA" != "$EXPECTED_HEAD_SHA" ]; then
   exit 1
 fi
 
-REVIEW_DOC_PATH="$(resolve_review_doc_path "$SOURCE_REPO_PATH" "$REVIEW_DOC_PATH" "$EXPECTED_BRANCH")" || {
-  echo "Error: Could not resolve the review doc. Pass --review-doc <path>." >&2
-  exit 1
-}
-SOURCE_REVIEW_DOC_CANONICAL_PATH="$REVIEW_DOC_PATH"
+ROUND_CONTEXT_JSON='{}'
 SOURCE_REVIEW_DOC_PATH=""
-if [ -f "$REVIEW_DOC_PATH" ]; then
+if [ -n "$REVIEW_DOC_PATH" ] || [ -n "$WORKTREE_ARG" ]; then
+  REVIEW_DOC_PATH="$(resolve_review_doc_path "$SOURCE_REPO_PATH" "$REVIEW_DOC_PATH" "$EXPECTED_BRANCH")" || {
+    echo "Error: Could not resolve the review doc. Pass --review-doc <path>." >&2
+    exit 1
+  }
   SOURCE_REVIEW_DOC_PATH="$REVIEW_DOC_PATH"
+  if [ ! -f "$REVIEW_DOC_PATH" ]; then
+    # First-run auto mode: review doc doesn't exist yet. Return a default Round 1 context
+    # so Phase B can create the initial review document at the resolved path.
+    ROUND_CONTEXT_JSON="$(jq -n \
+      --argjson round_number 1 \
+      --arg action "new" \
+      --arg status "draft" \
+      --arg artifact_dir ".pr-review/pr-${PR_NUMBER}/round-1" \
+      '{round_number: $round_number, action: $action, status: $status, artifact_dir: $artifact_dir, worktree_path: null}')"
+  else
+    ROUND_CONTEXT_JSON="$(compute_round_context "$REVIEW_DOC_PATH" "$PR_NUMBER")"
+  fi
 fi
-ROUND_CONTEXT_JSON="$(compute_round_context "$REVIEW_DOC_PATH" "$PR_NUMBER")"
 
 if [ -z "$WORKTREE_ARG" ]; then
+  if [ "$SOURCE_DIRTY_JSON" = "true" ]; then
+    guidance="Target repo is dirty. Re-run with --worktree auto or --worktree /abs/path to continue safely."
+    echo "$guidance" >&2
+    emit_json "needs-worktree" "stop" "$guidance" false false "$SOURCE_DIRTY_JSON" false \
+      "$SOURCE_REPO_PATH" "$SOURCE_REPO_PATH" "$EXPECTED_REPO" "$PUSH_REMOTE" "$EXPECTED_BRANCH" \
+      "$EXPECTED_HEAD_SHA" "$CURRENT_HEAD_SHA" "$REVIEW_DOC_PATH" "$ROUND_CONTEXT_JSON" "none" "" "$CURRENT_BRANCH"
+    exit 2
+  fi
+
   if [ "$CURRENT_BRANCH" != "$EXPECTED_BRANCH" ]; then
     echo "Error: Current branch is '${CURRENT_BRANCH:-DETACHED}', but the PR head branch is '${EXPECTED_BRANCH}'." >&2
     exit 1
@@ -458,15 +465,6 @@ if [ -z "$WORKTREE_ARG" ]; then
   if [ "$CURRENT_HEAD_SHA" != "$EXPECTED_HEAD_SHA" ]; then
     echo "Error: Current HEAD is ${CURRENT_HEAD_SHA}, but the PR head SHA is ${EXPECTED_HEAD_SHA}. Fetch/reset the branch or use --worktree." >&2
     exit 1
-  fi
-
-  if [ "$SOURCE_DIRTY_JSON" = "true" ]; then
-    guidance="Target repo is dirty. Re-run with --worktree auto or --worktree /abs/path to continue safely."
-    echo "$guidance" >&2
-    emit_json "needs-worktree" "stop" "$guidance" false false "$SOURCE_DIRTY_JSON" true \
-      "$SOURCE_REPO_PATH" "$SOURCE_REPO_PATH" "$EXPECTED_REPO" "$PUSH_REMOTE" "$EXPECTED_BRANCH" \
-      "$EXPECTED_HEAD_SHA" "$CURRENT_HEAD_SHA" "$REVIEW_DOC_PATH" "$ROUND_CONTEXT_JSON" "none" "" "$CURRENT_BRANCH" "$SOURCE_REVIEW_DOC_PATH" false
-    exit 2
   fi
 
   EXCLUDE_PATH="$(ensure_local_exclude "$SOURCE_REPO_PATH")"
@@ -556,11 +554,8 @@ fi
 EXCLUDE_PATH="$(ensure_local_exclude "$TARGET_WORKTREE_PATH")"
 WORKTREE_REVIEW_DOC_PATH="$REVIEW_DOC_PATH"
 REVIEW_DOC_SEEDED=false
-if [ -n "$SOURCE_REVIEW_DOC_CANONICAL_PATH" ]; then
-  WORKTREE_REVIEW_DOC_PATH="$(resolve_worktree_review_doc_path "$SOURCE_REPO_PATH" "$TARGET_WORKTREE_PATH" "$SOURCE_REVIEW_DOC_CANONICAL_PATH")" || exit 1
-  mkdir -p "$(dirname "$WORKTREE_REVIEW_DOC_PATH")"
-fi
 if [ -n "$SOURCE_REVIEW_DOC_PATH" ]; then
+  WORKTREE_REVIEW_DOC_PATH="$(resolve_worktree_review_doc_path "$SOURCE_REPO_PATH" "$TARGET_WORKTREE_PATH" "$SOURCE_REVIEW_DOC_PATH")" || exit 1
   REVIEW_DOC_SEEDED="$(seed_review_doc_into_worktree "$SOURCE_REVIEW_DOC_PATH" "$WORKTREE_REVIEW_DOC_PATH")"
 fi
 emit_json "ready" "${ROUND_ACTION}" "" "$CREATED_JSON" "$REUSED_JSON" "$SOURCE_DIRTY_JSON" "$HEAD_MATCHES_JSON" \
