@@ -6,6 +6,40 @@ The format is based on Keep a Changelog and the project follows Semantic Version
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-17
+
+> Release title: review intelligence + per-project settings
+
+### Added
+- **Per-project settings file** (`.claude/pr-review.local.md`): configurable output language, default review source, default repo path, review dimensions per mode, fix-forward exclusion patterns, and developer profile tracking toggle. CLI flags override settings; settings override defaults.
+- **`gh pr diff` fallback**: when the target repo is not cloned locally, the skill now uses `gh pr diff <PR#> --repo <owner/repo>` to fetch actual file-level changes via GitHub API instead of silently relying on provider summaries.
+- **Severity count validation**: the skill now cross-checks the severity summary line against individual finding detail labels before finalizing, preventing mismatches (e.g., claiming MEDIUM 3 when one is actually LOW).
+- **Fix-forward exclusion patterns**: never auto-modify migration files, Dockerfiles, CI workflows, lockfiles, or environment files. These get "Manual fix recommended" instead.
+- **Fix-forward commit hygiene**: reads `git log --oneline -10` to match repo commit convention, uses specific-file `git add` only (never broad staging), and never includes `Co-Authored-By` or similar attribution trailers.
+- **Developer profile dedup**: checks for existing ticket+date entries before appending to prevent duplicates across multiple review iterations.
+- **Output template reference file** (`references/output-template.md`): extracted from SKILL.md for progressive disclosure (SKILL.md reduced from 700 to 572 lines).
+
+### Changed
+- **Quick mode depth reduced**: now reviews top 5 dimensions (Bugs, Architecture, React/TypeScript, Error Handling, Performance) instead of all 9, producing meaningfully shorter reviews. Quick mode saves to `[TICKET]-review-quick.md` to avoid overwriting full reviews.
+- **Independent review execution order enforced**: Step 4 (independent code review) must complete entirely before reading any AI provider comments in Step 5. This prevents confirmation bias from Copilot/CodeRabbit data contaminating "independent" findings.
+- **Step 1 clarified**: now notes which AI providers have data available without reading their actual comments. Inline summaries visible in the PR doc must not influence Step 4.
+- **Dirty detection relaxed**: only staged changes (`git diff --cached`) trigger the dirty-repo block. Unstaged modifications (e.g., local `.gitignore` tweaks) are no longer considered dirty.
+- **Repo access resolution chain**: `--repo-path` → settings `default_repo_path` → CWD → `gh pr diff` fallback → graceful degradation with explicit disclosure.
+
+### Removed
+- **Difficulty scale**: removed the 1-5 difficulty rating and associated criteria table. It was a vestige from the CodeRabbit-only v0.1.0 era with no clear criteria for multi-provider reviews.
+
+### Fixed
+- Fix-forward no longer auto-modifies immutable framework files (Supabase migrations, Prisma migrations, etc.).
+- Fix-forward no longer uses broad `git add` commands that could stage unrelated user changes.
+- Fix-forward no longer includes `Co-Authored-By` attribution in generated commits.
+- Fix-forward now matches the target repo's commit message convention.
+- Quick mode no longer overwrites full review files (uses `-quick` suffix).
+
+### Release Boundary
+- `0.3.0` completes the MVP improvement plan (Phases 0-2): baseline measurement, bug fixes, intelligence improvements, and per-project settings.
+- Dedicated agent, PreToolUse hook, `${CLAUDE_PLUGIN_ROOT}` paths, and full plugin restructure are deferred to `0.4.0` (Post-MVP Phase 3).
+
 ## [0.2.2] - 2026-03-14
 
 > Release title: mixed-provider auto-mode hardening
