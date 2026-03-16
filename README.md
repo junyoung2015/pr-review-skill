@@ -20,7 +20,7 @@ What that pipeline gives you:
 - triage **GitHub Copilot** and **CodeRabbit** comments together
 - separate provider-specific feedback cleanly
 - support fix-forward workflow with managed Round N records
-- stop safely on dirty repos unless a clean worktree is prepared
+- stop safely on repos with staged changes unless a clean worktree is prepared (unstaged modifications are OK)
 - preview reply/resolve actions safely before any `--live` mutation
 
 Direct code review remains the primary output. AI review triage is secondary.
@@ -123,6 +123,31 @@ Once installed, use `/pr-review` directly:
 
 If Claude Code auto-triggers the skill from natural language, that also works. `/pr-review` is just the most reliable explicit entrypoint.
 
+### Per-Project Settings
+
+Create `.claude/pr-review.local.md` in your project root to customize behavior per-project:
+
+```yaml
+---
+output_language: ko          # ko, en, ja
+default_review_source: all   # all, coderabbit, copilot, none
+default_repo_path: ""        # absolute path to target repo (avoids --repo-path every time)
+quick_review_dimensions:     # which dimensions for --quick mode
+  - bugs
+  - architecture
+  - react-typescript
+  - error-handling
+  - performance
+fix_forward_exclusions:      # patterns fix-forward should never auto-modify
+  - "**/migrations/**"
+  - "Dockerfile"
+  - ".github/workflows/**"
+track_developer_profiles: true
+---
+```
+
+This file is gitignored by default (`.claude/*.local.md`). CLI flags override settings.
+
 Do not rely on `/pr-review:pr-review` for flag-heavy usage. The supported command entrypoint is `/pr-review`.
 
 ### Modes
@@ -130,7 +155,7 @@ Do not rely on `/pr-review:pr-review` for flag-heavy usage. The supported comman
 | Mode | Flag | What it does |
 |------|------|-------------|
 | Full Review | _(default)_ | Git-truth validation, deep code review, AI review triage, developer tracking |
-| Quick Review | `--quick` | Skip AI review triage — just git-truth + deep code review |
+| Quick Review | `--quick` | Skip AI review triage — focused review on top 5 dimensions (bugs, architecture, React/TS, error handling, performance) |
 | Triage Only | `--triage-only` | Only process GitHub Copilot and/or CodeRabbit comments |
 | Auto Review | `--auto <PR#>` | End-to-end: fetch PR, review, fix-forward, then optionally commit/push/reply |
 | Developer History | `--history <github-id>` | Show accumulated review patterns for a developer |
