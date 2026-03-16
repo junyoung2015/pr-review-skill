@@ -1,7 +1,7 @@
 {
   "name": "pr-review",
   "description": "Automated PR review pipeline - deep code review plus GitHub Copilot and CodeRabbit comment triage, fix-forward support, and educational developer feedback.",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "author": {
     "name": "Jun Young Sohn",
     "url": "https://github.com/junyoung2015"
