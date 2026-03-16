@@ -14,12 +14,25 @@ description: >
 
 Help Eddie (team leader) efficiently review PRs through independent deep code analysis. Produce structured review documents with git-truth validation, scope-aware findings, educational feedback, and developer growth tracking.
 
-**Output language**: Korean with English technical terms (component names, TypeScript types, React concepts).
+## Settings
+
+On startup, check for a settings file at `.claude/pr-review.local.md` (relative to the project root). If it exists, read the YAML frontmatter to configure behavior:
+
+- `output_language` — review feedback language (default: `ko`)
+- `default_review_source` — default `--review-source` value (default: `all`)
+- `default_repo_path` — default `--repo-path` for auto mode (avoids passing it every time)
+- `full_review_dimensions` / `quick_review_dimensions` — which of the 9 dimensions to check per mode
+- `fix_forward_exclusions` — file patterns that fix-forward should never auto-modify
+- `track_developer_profiles` — whether to create/update developer profiles
+
+If the settings file doesn't exist, use the defaults defined in this skill. Settings from the file override the defaults. CLI flags (e.g., `--review-source copilot`) override settings.
+
+**Output language**: Determined by `output_language` setting. Default: Korean with English technical terms (component names, TypeScript types, React concepts).
 
 ## Modes
 
 1. **Full Review** (default) — Complete PR review: git-truth validation, deep code review, AI review triage (GitHub Copilot and/or CodeRabbit), developer tracking
-2. **Quick Review** (`--quick`) — Skip AI review triage + developer history. Just git-truth validation and deep code review. Use for fast turnaround when provider output is unavailable or irrelevant. The output document must **completely omit** the AI review triage section (not include it with a "skipped" note — omit it entirely).
+2. **Quick Review** (`--quick`) — Skip AI review triage + developer history. Focused git-truth validation and streamlined code review. Use for fast turnaround when provider output is unavailable or irrelevant. The output document must **completely omit** the AI review triage section (not include it with a "skipped" note — omit it entirely). Quick mode also reduces review depth: focus on the top 5 dimensions (Bugs & Correctness, Architecture/FSD, React & TypeScript, Error Handling, Performance) and skip Sibling Consistency, DRY/Duplication, UI/Design System, and Accessibility unless an obvious issue is spotted. This produces a meaningfully shorter and faster review, not just the same review minus the triage section.
 3. **Triage Only** (`--triage-only`) — Only process GitHub Copilot and/or CodeRabbit comments without deep code review
 4. **Developer History** (`--history <github-id>`) — Show a developer's accumulated review patterns
 5. **Auto Review** (`--auto <PR#>`) — Worktree-aware end-to-end pipeline: fetch PR data, run the full review, prepare a managed Round N record, generate provider-neutral artifacts, preview mutations safely, and only perform live commit/push/reply/resolve when `--live` is explicitly present. Auto mode executes the workflow; it does **not** invent autonomous review judgment. See Step 11.
@@ -33,9 +46,9 @@ When invoked, extract these from the user's message:
 - **GitHub ID** (required): PR creator's GitHub username — extract from the PR doc title (`# [TICKET] Title by <github-id>`) or ask the user
 - **Ticket ID** (auto-extracted): Extracted from PR title or branch name (e.g., `ACME-595`). Used for scope determination.
 - **Review source** (optional): `--review-source <all|coderabbit|copilot|none>`. Default is `all` for Full Review / Triage Only / Auto Review and `none` for Quick Review.
-- **Repo path** (auto mode): `--repo-path <abs-path>`. Explicit target product repo path for auto mode. If omitted, resolve from the current working directory only; never guess across repos.
+- **Repo path** (auto mode): `--repo-path <abs-path>`. Explicit target product repo path for auto mode. If omitted, check `default_repo_path` from `.claude/pr-review.local.md` settings. If neither is set, resolve from the current working directory only; never guess across repos.
 - **Review doc override** (auto mode): `--review-doc <path>`. Optional explicit Round N review record path. Resolution precedence is: explicit `--review-doc`, then `docs/reviews/<TICKET>-review.md` derived from the PR head branch basename, else fail fast.
-- **Worktree policy** (auto mode): `--worktree auto|<abs-path>`. `auto` creates or reuses a deterministic clean worktree for the current PR round. An explicit path reuses or creates that worktree path. If the target repo is dirty and no worktree option is supplied, auto mode must stop safely.
+- **Worktree policy** (auto mode): `--worktree auto|<abs-path>`. `auto` creates or reuses a deterministic clean worktree for the current PR round. An explicit path reuses or creates that worktree path. If the target repo has staged changes and no worktree option is supplied, auto mode must stop safely. Unstaged modifications are not considered dirty.
 - **Dry run** (optional): `--dry-run`. Preview GitHub reply / thread-resolution mutations without posting them.
 - **Live confirmation** (auto mode): `--live`. Required before commit, push, reply, or resolve actions happen. Without `--live`, `/pr-review --auto` stops after artifacts and previews are generated.
 - **Flags** (optional): `--quick`, `--triage-only`, `--history <github-id>`, `--auto <PR#>`, `--review-source <...>`, `--repo-path <abs-path>`, `--review-doc <path>`, `--worktree auto|<abs-path>`, `--dry-run`, `--live`
@@ -68,21 +81,31 @@ Read the PR doc and extract structured data:
 1. **Header**: ticket ID (e.g. `ACME-595`), title, author GitHub ID
 2. **Features section** (`## ✨ Features`): what the PR claims to do → build a **claim list**
 3. **Changes section** (`## 🔄 Changes`): component table, file tree → build a **claimed file list**
-4. **AI review summaries**:
-   - **CodeRabbit Summary** (after `<!-- auto-generated comment: release notes -->`) if present
-   - **GitHub Copilot Summary** (after `## Summary by GitHub Copilot`) if present
-5. **AI review comments**:
-   - Prefer sibling `*.review-data.json` for structured Copilot/CodeRabbit comments when available
-   - Fall back to markdown sections such as `# Comment | by CodeRabbit bot` or `# Comment | by GitHub Copilot`
+4. **Note available AI review providers** (do NOT read their content yet):
+   - Check if a sibling `*.review-data.json` sidecar file exists (structured provider data)
+   - Check if CodeRabbit sections exist in the PR doc (e.g., `<!-- auto-generated comment: release notes -->`)
+   - Check if GitHub Copilot sections exist (e.g., `## Summary by GitHub Copilot`)
+   - Record which providers have data available — actual comment extraction happens in Step 5
+   - Note: inline summaries (CodeRabbit walkthrough, Copilot summary) may be visible when reading the PR doc. Do not let them influence your independent analysis in Step 4.
 
-The claim list is used in Step 2 for git-truth validation. For AI review parsing, load only the provider guide(s) you need:
+The claim list is used in Step 2 for git-truth validation. Provider guides are loaded in Step 5:
 
 - `references/coderabbit-triage-guide.md`
 - `references/copilot-triage-guide.md`
 
-### Step 2: Git-Truth Validation (NEW)
+### Step 2: Git-Truth Validation
 
 Verify PR document claims against the actual git diff. Load `references/review-criteria.md` Section J.
+
+**Repo access requirement**: Steps 2-4 require access to the actual git repository. Resolution order:
+1. `--repo-path` if provided
+2. `default_repo_path` from `.claude/pr-review.local.md` settings
+3. Current working directory if it matches the PR's target repo
+4. If the PR is from a GitHub URL and no local repo is available, use `gh pr diff <PR#> --repo <owner/repo>` to fetch the diff via GitHub API — this provides file-level changes without a full clone
+5. If none of the above work, degrade gracefully and clearly disclose the limitation in the review output:
+   - Skip git-truth validation (note: "Git-truth validation skipped — repo not available locally")
+   - In Step 3, rely on PR doc file listings and the `gh pr diff` output if available — but clearly label all findings as "based on PR doc / GitHub API diff, not verified against full source code"
+   - Never silently pretend you read actual source code when you didn't
 
 1. Run `git diff dev..HEAD --name-only` to get the authoritative list of changed files
 2. Cross-reference with the PR doc's file tree:
@@ -116,9 +139,11 @@ The actual source code is the primary review source — the PR doc provides cont
 
 Prioritize: new files first, then modified files, then renamed/deleted files.
 
-### Step 4: Independent Deep Code Review (NEW — PRIMARY SPINE)
+### Step 4: Independent Deep Code Review (PRIMARY SPINE)
 
 This is the core of the review and runs **unconditionally** — regardless of whether GitHub Copilot or CodeRabbit produced comments or not. Load `references/review-criteria.md` and perform a thorough, adversarial review of every IN_SCOPE file.
+
+**CRITICAL execution order**: Complete this entire step BEFORE reading any AI provider comments (Step 5). Do not read the `*.review-data.json` sidecar, CodeRabbit sections, or Copilot summaries until Step 4 is fully complete. This ensures findings are genuinely independent. If you read provider comments first, your "independent" findings will be contaminated by confirmation bias.
 
 **Review Dimensions** (9 categories):
 
@@ -153,6 +178,8 @@ This is the core of the review and runs **unconditionally** — regardless of wh
 7. **Audit test quality**: If the PR includes test files, verify they contain real assertions — not placeholder `expect(true).toBe(true)` or empty test bodies. Check that tests actually exercise the changed logic, not just import the module. Missing tests for new utility functions or complex logic = a finding.
 8. **Classify findings** on both axes: Fix-Self or Pass-to-Creator (who fixes it) AND 🔴 HIGH / 🟡 MEDIUM / 🟢 LOW (severity). See the Classification Framework below.
 9. **Record evidence**: Every finding must include file:line references and either a code snippet or a concrete description of the issue. No vague "could be improved" statements.
+
+**Severity count validation**: After classifying all findings, count the severity labels in each individual finding's detail block and verify they match the summary line (`총 X건: 🔴 HIGH A건 / 🟡 MEDIUM B건 / 🟢 LOW C건`). If a finding is labeled MEDIUM in the summary but LOW in its detail, fix the inconsistency before finalizing. The detail block's severity is the source of truth.
 
 **This step should produce the bulk of the review findings**. If it produces fewer than 3 findings for a non-trivial PR, proceed to Step 6 for re-examination.
 
@@ -226,11 +253,13 @@ If the PR is non-trivial (3+ IN_SCOPE files with meaningful logic) and Steps 4-5
 
 ### Step 8: Generate Review Document
 
-Load `references/feedback-templates.md` for Korean phrasing. Compose the review following the output template below. Save to:
+Load `references/output-template.md` for the review structure and `references/feedback-templates.md` for Korean phrasing. Save to:
 
 ```
 docs/reviews/[TICKET-ID]-review.md
 ```
+
+When using `--quick` mode, add `-quick` suffix to avoid overwriting a full review: `docs/reviews/[TICKET-ID]-review-quick.md`.
 
 Present a summary to Eddie in the conversation after saving.
 
@@ -248,7 +277,18 @@ Create or update `docs/reviews/developers/<github-id>.md`:
 This step activates when the reviewer decides to fix issues directly instead of waiting for the PR creator. Common triggers include: "직접 수정", "내가 고칠게", "시간이 없어서 내가 수정", "fix it myself", "fix-forward".
 
 1. Apply fixes to the codebase based on the review findings (both Fix-Self and Pass-to-Creator items)
+   - **Fix-forward exclusions**: Never auto-modify files matching the patterns in `fix_forward_exclusions` from `.claude/pr-review.local.md` settings (defaults below). Instead, output "Manual fix recommended" with an explanation:
+     - `**/migrations/**`, `**/*.sql` in migration directories (immutable after application in Supabase, Prisma, etc.)
+     - `Dockerfile`, `docker-compose*.yml`
+     - `.github/workflows/**` (CI/CD pipelines)
+     - `*.lock` (lockfiles)
+     - `.env*` (environment files)
+   - For any fix touching files outside the immediate feature code, show the proposed change and ask for confirmation before applying
+   - **Track every file you modify** in a list — you will need this for step 2b
 2. Run `pnpm typecheck` to verify all fixes pass
+   a. **Commit convention**: Before creating any commit, run `git log --oneline -10` in the target repo to detect the existing commit message convention (e.g., conventional commits, gitmoji, ticket prefixes). Match that convention exactly.
+   b. **Specific git add only**: Only `git add` the specific files you modified during fix-forward. Never use `git add .`, `git add -A`, or any broad staging command. This prevents accidentally staging the user's unrelated changes.
+   c. **No attribution metadata**: Never include `Co-Authored-By`, `Signed-off-by`, or any similar attribution trailer in generated commits.
 3. Load `references/fix-forward-template.md` for the appendable section format
 4. Append the fix log to the **existing** review document (`docs/reviews/[TICKET-ID]-review.md`)
 5. Use `Round 1` for the first fix pass; increment to `Round 2`, `Round 3` etc. if new issues arise after pushing fixes (e.g., new GitHub Copilot or CodeRabbit comments)
@@ -271,7 +311,7 @@ When invoked with `--auto <PR#>`, execute the managed pipeline below. Use the ca
 5. Run `scripts/prepare-pr-worktree.sh <review-data.json> [--repo-path <abs-path>] [--review-doc <path>] [--worktree auto|<abs-path>]`.
    - This step is mandatory. Do **not** improvise around it.
    - If the script returns `status: needs-repo-path`, stop immediately and tell Eddie to rerun with `--repo-path <abs-path>`.
-   - If the target repo is dirty and no worktree override is supplied, stop safely and tell Eddie to rerun with `--worktree auto` or `--worktree <abs-path>`.
+   - If the target repo has **staged changes** (`git diff --cached` is non-empty) and no worktree override is supplied, stop safely and tell Eddie to rerun with `--worktree auto` or `--worktree <abs-path>`. Unstaged modifications (e.g. local `.gitignore` changes) are not considered dirty — they won't leak into commits as long as fix-forward only `git add`s specific files.
    - If `--worktree auto` is used, create or reuse the deterministic clean worktree for the current PR round.
    - If worktree mode is used and the review doc exists only in the source repo clone, the script mirrors that review doc into the prepared worktree at the same repo-relative path.
    - If the review doc does not exist yet, the script must still return the resolved canonical `review_doc_path` plus a Round 1 context so the first review document can be created during Phase B.
@@ -413,153 +453,7 @@ The guiding principle: **"Would fixing this myself teach the developer nothing, 
 
 ## Output Template
 
-Use this exact structure for the review document:
-
-```markdown
-# PR Review: [TICKET-ID] Title
-
-**리뷰어**: Eddie | **작성자**: @github-id | **날짜**: YYYY/MM/DD
-**브랜치**: branch-name | **리뷰 난이도**: [1-5] | **소요 시간**: ~N분
-
----
-
-## 요약 (Summary)
-
-[2-3 sentences. Always start with something positive. Then overall assessment.]
-
-## 스코프 확인 (Scope Note)
-
-[Only include if OUT_OF_SCOPE files exist. Otherwise omit this section entirely.]
-
-> 📌 이 브랜치에는 [TICKET-ID] 외 다른 티켓의 커밋이 포함되어 있습니다.
-> 본 리뷰는 [TICKET-ID] 스코프의 파일([N]개)에 집중하고, 스코프 외 파일([M]개)은 skim 수준으로 확인했습니다.
-
-## PR 기술 검증 (Git-Truth Validation)
-
-| PR 문서 주장      | 실제 코드             | 일치 여부 |
-| ----------------- | --------------------- | --------- |
-| [Feature claim 1] | [Verification result] | ✅/❌/⚠️  |
-
-[Brief note if discrepancies found, otherwise: "PR 문서와 실제 코드가 일치합니다."]
-
-## 코드 리뷰 결과 (Code Review Findings) ← PRIMARY
-
-**총 X건**: 🔴 HIGH A건 / 🟡 MEDIUM B건 / 🟢 LOW C건
-
-### ✅ 내가 직접 수정 (I'll fix) — X건
-
-| #   | 심각도 | 파일        | 내용       | 수정 방법        |
-| --- | ------ | ----------- | ---------- | ---------------- |
-| 1   | 🔴     | `path:line` | 한 줄 설명 | 구체적 수정 내용 |
-
-### 📚 작성자에게 전달 (Pass to creator) — Y건
-
-#### 🔴 [카테고리: e.g., React Patterns]
-
-**파일**: `path/to/file.tsx:52-54`
-**심각도**: 🔴 HIGH — [merge 영향: e.g., "머지 전 수정 필요"]
-**문제**: [무엇이 문제인지 — 간결하게]
-**이유**: [왜 이것이 중요한지 — 교육적 설명]
-**제안**: [어떻게 고치면 좋은지 — 구체적 코드 예시 포함]
-
----
-
-## AI 리뷰 코멘트 검증 (Triage) ← SECONDARY
-
-[If Quick Review mode or `--review-source none`: OMIT THIS ENTIRE SECTION — do not render it at all.]
-
-[If one or more providers were selected but all of them have 0 comments:]
-
-> AI 리뷰 코멘트가 없습니다.
-> 본 리뷰는 코드 직접 분석을 기반으로 작성되었습니다.
-
-[If comments exist:]
-**총 N건**: Fix-Self X건 / Pass-to-Creator Y건 / Dismissed Z건
-
-### GitHub Copilot — N건
-
-[If GitHub Copilot has 0 comments:]
-
-> GitHub Copilot 코멘트가 없습니다 (미실행, 자동 리뷰 미설정, 또는 최신 라운드 코멘트 없음).
-
-[If GitHub Copilot comments exist:]
-**총 N건**: Fix-Self X건 / Pass-to-Creator Y건 / Dismissed Z건
-
-#### ✅ 내가 직접 수정 (I'll fix) — X건
-
-| #   | 심각도 | 파일        | 내용       | 수정 방법        |
-| --- | ------ | ----------- | ---------- | ---------------- |
-| 1   | 🟡     | `path:line` | 한 줄 설명 | 구체적 수정 내용 |
-
-#### 📚 작성자에게 전달 (Pass to creator) — Y건
-
-[Same educational format as code review findings, with 심각도 field]
-
-#### ❌ 기각 (Dismissed) — Z건
-
-| #   | 파일   | GitHub Copilot 의견 | 기각 사유 |
-| --- | ------ | ------------------- | --------- |
-| 1   | `path` | 요약                | 사유      |
-
-### CodeRabbit — N건
-
-[If CodeRabbit has 0 comments:]
-
-> CodeRabbit 코멘트가 없습니다 (Free 플랜 제한 또는 미설정).
-
-[If CodeRabbit comments exist:]
-**총 N건**: Fix-Self X건 / Pass-to-Creator Y건 / Dismissed Z건
-
-#### ✅ 내가 직접 수정 (I'll fix) — X건
-
-| #   | 심각도 | 파일        | 내용       | 수정 방법        |
-| --- | ------ | ----------- | ---------- | ---------------- |
-| 1   | 🟡     | `path:line` | 한 줄 설명 | 구체적 수정 내용 |
-
-#### 📚 작성자에게 전달 (Pass to creator) — Y건
-
-[Same educational format as code review findings, with 심각도 field]
-
-#### ❌ 기각 (Dismissed) — Z건
-
-| #   | 파일   | CodeRabbit 의견 | 기각 사유 |
-| --- | ------ | --------------- | --------- |
-| 1   | `path` | 요약            | 사유      |
-
-[If 5+ scope dismissals, use consolidated footer format]
-
-## 작성자 피드백 (Feedback for @github-id)
-
-### 잘한 점 (Strengths)
-
-- [구체적인 칭찬 — 무엇을 잘했는지 명시]
-- [다른 팀원이 참고할 만한 좋은 패턴이 있다면 언급]
-
-### 학습 포인트 (Learning Points)
-
-[Pass-to-Creator 항목들을 교육적으로 재정리. 패턴별 그룹핑.]
-
-> 💡 **[패턴 이름]**
-> [왜 이것이 중요한지 2-3문장 설명]
-> [코드 예시가 있으면 포함]
-
-### 다음 PR에서 신경 쓸 점
-
-1. [구체적이고 실행 가능한 조언 — "~를 제출 전에 확인해보세요"]
-2. [선택적 두 번째 조언]
-```
-
----
-
-## Difficulty Scale
-
-| 난이도 | 기준                                                | 예시                                 |
-| ------ | --------------------------------------------------- | ------------------------------------ |
-| 1      | 파일 1-2개, 단순 UI 수정, 로직 변경 없음            | 텍스트 변경, 스타일 수정             |
-| 2      | 파일 3-5개, 단일 기능 구현, 명확한 패턴             | 새 컴포넌트 1개 추가, API 연결       |
-| 3      | 파일 5-10개, 기존 구조 리팩토링 또는 여러 기능 수정 | 컴포넌트 분리, 상태 관리 변경        |
-| 4      | 파일 10+개, 아키텍처 변경, 여러 레이어 영향         | FSD 레이어 재구성, 인증 흐름 변경    |
-| 5      | 대규모 리팩토링, 브레이킹 체인지, 크로스-앱 영향    | 브릿지 스키마 변경, 빌드 시스템 변경 |
+Load `references/output-template.md` for the exact review document structure. Follow it precisely — the template defines all section headings, table formats, and conditional rendering rules (e.g., omit AI triage section in quick mode).
 
 ---
 
@@ -642,7 +536,7 @@ docs/reviews/developers/<github-id>.md
 ### Update Rules
 
 - **New developer**: Create file from template, populate all sections
-- **Existing developer**: Append to Review History and Category sections, update Statistics
+- **Existing developer**: Append to Review History and Category sections, update Statistics. Before appending, check if an entry for the same ticket+date already exists — if so, update it instead of creating a duplicate.
 - **Category with 0 entries**: Keep the heading but leave empty (don't delete categories)
 - **Strengths/Watch areas**: Re-derive from the full category history each time
 
@@ -655,6 +549,7 @@ Load these on demand during the workflow:
 | Reference                               | When to Load     | Purpose                                                                   |
 | --------------------------------------- | ---------------- | ------------------------------------------------------------------------- |
 | `references/review-criteria.md`         | Steps 2, 4, 6    | Git-truth validation (J), code review checklist (A-I), re-examination (K) |
+| `references/output-template.md`         | Step 8           | Exact review document structure with all section headings and table formats |
 | `references/feedback-templates.md`      | Step 8           | Korean phrase templates for writing feedback                              |
 | `references/coderabbit-triage-guide.md` | Step 5           | How to parse, classify, and scope-triage CodeRabbit comments              |
 | `references/copilot-triage-guide.md`    | Step 5           | How to parse, classify, and scope-triage GitHub Copilot comments          |
