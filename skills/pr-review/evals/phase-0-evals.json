@@ -1,0 +1,77 @@
+{
+  "skill_name": "pr-review",
+  "phase": "0",
+  "date": "2026-03-16",
+  "notes": "Adapted from original evals 1, 2, 4 using real available data. No baseline runs — with-skill only. See docs/research/phase-0-execution-plan.md for rationale.",
+  "evals": [
+    {
+      "id": "a1",
+      "name": "full-review-with-copilot-triage",
+      "prompt": "PR #179 리뷰해줘. docs/pr-for-review/[PR-179] fix- full adversarial review for multiple stories.md 파일이고, repo는 junyoung2015/jjp, 브랜치는 fix/full-adversarial-review-from-20260218, 작성자는 junyoung2015야. --review-source copilot 로 처리해.",
+      "expected_output": "A structured review document with git-truth validation, scope-aware deep code review as primary section, Copilot triage as secondary section, and developer feedback in Korean. Developer profile created.",
+      "files": [
+        "docs/pr-for-review/[PR-179] fix- full adversarial review for multiple stories.md",
+        "docs/pr-for-review/[PR-179] fix- full adversarial review for multiple stories.review-data.json"
+      ],
+      "assertions": [
+        "Review document saved to docs/reviews/ with PR-179 or ticket-based filename",
+        "Developer profile created at docs/reviews/developers/junyoung2015.md",
+        "스코프 확인 section present if OUT_OF_SCOPE files detected, omitted cleanly otherwise",
+        "PR 기술 검증 section with verification table comparing PR claims to actual git diff",
+        "코드 리뷰 결과 section appears ABOVE AI 리뷰 코멘트 검증 section",
+        "코드 리뷰 결과 contains at least 3 substantive findings from independent code analysis",
+        "Findings use dual classification: Fix-Self/Pass-to-Creator AND severity (HIGH/MEDIUM/LOW)",
+        "코드 리뷰 결과 includes severity summary line (총 X건: HIGH A건 / MEDIUM B건 / LOW C건)",
+        "AI 리뷰 코멘트 검증 section triages all 4 available Copilot inline comments",
+        "Review contains triage categories: Fix-Self, Pass-to-Creator, and/or Dismissed",
+        "Fix-Self items include severity emoji and concrete one-line fix descriptions",
+        "Pass-to-Creator items include educational Korean explanations with structure",
+        "Feedback section contains 잘한 점 (Strengths) before 학습 포인트 (Learning Points)",
+        "Developer profile has categorized entries (at least 3 distinct categories)",
+        "Review shows evidence of reading actual source code (file:line references from real diff)",
+        "Korean language used for all feedback with English technical terms preserved",
+        "At least one finding identifies a real code concern beyond style nits",
+        "Git-truth verification table lists files that actually appear in the diff"
+      ]
+    },
+    {
+      "id": "a2",
+      "name": "quick-mode-review",
+      "prompt": "PR #179 퀵 리뷰해줘 --quick. docs/pr-for-review/[PR-179] fix- full adversarial review for multiple stories.md 파일이고, repo는 junyoung2015/jjp, 브랜치는 fix/full-adversarial-review-from-20260218, 작성자는 junyoung2015야.",
+      "expected_output": "A quick review with git-truth validation and deep code review but NO AI review triage section and NO developer history update. Faster and more focused output.",
+      "files": [
+        "docs/pr-for-review/[PR-179] fix- full adversarial review for multiple stories.md"
+      ],
+      "assertions": [
+        "Review document saved to docs/reviews/ with PR-179 or ticket-based filename",
+        "PR 기술 검증 section with verification table",
+        "코드 리뷰 결과 contains substantive findings from independent code analysis, OR if repo access unavailable: review explicitly discloses limitation and findings are labeled as doc-based/API-diff-based",
+        "Review does NOT contain an AI 리뷰 코멘트 검증 section (skipped in quick mode)",
+        "Review does NOT create or update developer profile (skipped in quick mode)",
+        "Review is noticeably shorter and more focused than a full review",
+        "Korean language used for all feedback with English technical terms preserved",
+        "Findings reference specific file:line locations from the actual diff, OR if repo access unavailable: review clearly labels findings as unverified against source code"
+      ]
+    },
+    {
+      "id": "b1",
+      "name": "zero-provider-standalone-review",
+      "prompt": "MOVE-643 PR 리뷰해줘. docs/pr-for-review/[MOVE-643] 장소 추가 날짜 선택 페이지 v2.md 파일이고, --repo-path /Users/eddie/Desktop/demodev/moving-frontend, 브랜치는 MOVE-643/place-select-day-v2, 작성자는 626-ju야. --worktree auto 로 처리해.",
+      "expected_output": "A full review with substantive code findings despite 0 AI review comments. The review's substance comes from independent deep code analysis, not provider triage. Git-truth validation table present. Developer profile created.",
+      "files": [
+        "docs/pr-for-review/[MOVE-643] 장소 추가 날짜 선택 페이지 v2.md"
+      ],
+      "assertions": [
+        "Review document saved to docs/reviews/MOVE-643-review.md",
+        "Developer profile created/updated at docs/reviews/developers/626-ju.md",
+        "PR 기술 검증 section with git-truth validation table",
+        "코드 리뷰 결과 contains substantive findings (at least 2) from independent code analysis with severity classification",
+        "Review does NOT collapse or produce hollow output despite 0 provider comments",
+        "Review shows evidence of reading actual source code (file:line references from real diff)",
+        "코드 리뷰 결과 appears as primary section (no AI triage section, or gracefully empty)",
+        "Korean language used for all feedback with English technical terms preserved",
+        "At least one finding identifies a real code concern beyond style nits"
+      ]
+    }
+  ]
+}
